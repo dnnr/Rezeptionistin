@@ -11,6 +11,7 @@ import logging
 import configparser
 from pyquery import PyQuery as pq
 from asyncirc.ircbot import IRCBot
+from datetime import timedelta
 
 config = configparser.ConfigParser()
 if not config.read("config.ini"):
@@ -25,6 +26,7 @@ debugchan=config.get('IRC', 'debugchan', fallback=None)
 useragent=config.get('HTTP', 'useragent')
 
 httpregex=re.compile(r'https?://')
+youtuberegex=re.compile(r'^(https?\:\/\/)?(www\.)?(youtube\.com|youtu\.?be)\/.+$')
 
 if sys.hexversion > 0x03000000:
   raw_input = input
@@ -49,13 +51,27 @@ def geturlfrommsg(message):
   url = re.search("(?P<url>https?://[^\s]+)", message).group("url")
   return url
 
+def sanitize(s):
+  return s.translate(str.maketrans("\n\r",'  '))
+
 def geturltitle(url):
+  if youtuberegex.search(url.lower()) is None:
+    # only react to youtube URLs for now
+    return ""
   try:
     page = pq(url, headers={'user-agent': useragent})
-    t = page("title").text().lstrip().encode('ascii','ignore')
+    title = page("title").text().lstrip()
+    if youtuberegex.search(url.lower()) is not None:
+      videoid = page.find('meta[itemProp="videoId"]')[0].attrib['content']
+      videoinfo = pq('https://gdata.youtube.com/feeds/api/videos/{}?v=2'.format(videoid), headers={'user-agent': useragent})
+      seconds = int(videoinfo ("duration")[0].attrib['seconds'])
+      timestr = timedelta(seconds=seconds)
+      title = "YouTube (…{id}): {title} ({duration})".format(id=videoid[-4:], title=re.sub(' - YouTube$', '', title), duration=timestr)
+    else:
+      title = "Title: {}".format(title)
   except:
-    t = ""
-  return t
+    title = ""
+  return sanitize(title)
 
 def send_message(self, recipient, msg):
   self.msg(recipient, "\x0F" + msg)
@@ -94,7 +110,7 @@ def on_msg(self, nick, host, channel, message):
     url = geturlfrommsg(message)
     title = geturltitle(url)
     if not title == "":
-      send_message(self, channel, "Title: {title}".format(title=title))
+      send_message(self, channel, "{title}".format(title=title))
 
 @irc.on_privmsg
 def on_privmsg(self, nick, host, message):
