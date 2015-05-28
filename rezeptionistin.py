@@ -20,8 +20,8 @@ if not config.read("config.ini"):
 server=config.get('IRC','server')
 port=int(config.get('IRC', 'port'))
 nick=config.get('IRC', 'nick')
-ircchan=config.get('IRC', 'ircchan')
-debugchan=config.get('IRC', 'debugchan')
+ircchan=config.get('IRC', 'ircchan', fallback=None)
+debugchan=config.get('IRC', 'debugchan', fallback=None)
 useragent=config.get('HTTP', 'useragent')
 
 httpregex=re.compile(r'https?://')
@@ -103,8 +103,10 @@ def on_privmsg(self, nick, host, message):
 
 # Start Bot
 irc.start()
-irc.join(ircchan)
-irc.join(debugchan)
+if ircchan:
+    irc.join(ircchan)
+if debugchan:
+    irc.join(debugchan)
 
 # Run Eventloop
 try:
