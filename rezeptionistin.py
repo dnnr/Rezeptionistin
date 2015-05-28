@@ -10,8 +10,6 @@ import urllib2
 import logging
 import ConfigParser
 from pyquery import PyQuery as pq
-from wikitools import wiki
-from wikitools import category
 from asyncirc.ircbot import IRCBot
 
 config = ConfigParser.ConfigParser()
@@ -25,8 +23,7 @@ nick=config.get('IRC', 'nick')
 ircchan=config.get('IRC', 'ircchan')
 debugchan=config.get('IRC', 'debugchan')
 useragent=config.get('HTTP', 'useragent')
-site = wiki.Wiki(config.get('MediaWiki', 'wikiapiurl'))
-site.login(config.get('MediaWiki', 'user'), config.get('MediaWiki', 'password'))
+
 httpregex=re.compile(r'https?://')
 
 if sys.hexversion > 0x03000000:
@@ -47,11 +44,6 @@ def netcat(hostname, port, content):
     f = data
   s.close()
   return f
-
-def wikiupdate(title, url):
-  cat = category.Category(site, "Linklist")
-  for article in cat.getAllMembersGen(namespaces=[0]):
-    article.edit(appendtext="\n* {title} - {url} \n".format(title=title, url=url))
 
 def geturlfrommsg(message):
   url = re.search("(?P<url>https?://[^\s]+)", message).group("url")
@@ -103,7 +95,6 @@ def on_msg(self, nick, host, channel, message):
     title = geturltitle(url)
     if not title == "":
       send_message(self, channel, "Title: {title}".format(title=title))
-      wikiupdate(title, url)
 
 @irc.on_privmsg
 def on_privmsg(self, nick, host, message):
