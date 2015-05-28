@@ -62,14 +62,17 @@ def geturltitle(url):
     page = pq(url, headers={'user-agent': useragent})
     title = page("title").text().lstrip()
     if youtuberegex.search(url.lower()) is not None:
-      videoid = page.find('meta[itemProp="videoId"]')[0].attrib['content']
-      videoinfo = pq('https://gdata.youtube.com/feeds/api/videos/{}?v=2'.format(videoid), headers={'user-agent': useragent})
-      seconds = int(videoinfo ("duration")[0].attrib['seconds'])
-      timestr = timedelta(seconds=seconds)
-      title = "YouTube (…{id}): {title} ({duration})".format(id=videoid[-4:], title=re.sub(' - YouTube$', '', title), duration=timestr)
+      videoid = page('meta[itemProp="videoId"]')[0].attrib['content']
+      durationstr = page('meta[itemProp="duration"]')[0].attrib['content']
+      match = re.search('PT(?P<minutes>[0-9]+)M(?P<seconds>[0-9]+)S', durationstr)
+      if match:
+        minutes, seconds = match.groups()
+        timestr = ' ({})'.format(timedelta(seconds=int(minutes) * 60 + int(seconds)))
+      title = "YouTube (…{id}): {title}{duration}".format(id=videoid[-4:], title=re.sub(' - YouTube$', '', title), duration=timestr)
     else:
       title = "Title: {}".format(title)
-  except:
+  except Exception as e:
+    # raise e
     title = ""
   return sanitize(title)
 
