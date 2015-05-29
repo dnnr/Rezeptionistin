@@ -9,9 +9,12 @@ import socket
 import urllib3
 import logging
 import configparser
-from pyquery import PyQuery as pq
 from asyncirc.ircbot import IRCBot
 from datetime import timedelta
+from bs4 import BeautifulSoup
+
+# no need for SSL verification here
+urllib3.disable_warnings()
 
 config = configparser.ConfigParser()
 if not config.read("config.ini"):
@@ -54,16 +57,27 @@ def geturlfrommsg(message):
 def sanitize(s):
   return s.translate(str.maketrans("\n\r",'  '))
 
+def getpage(url):
+  http = urllib3.PoolManager()
+  req = http.request('GET', url, headers={ 'User-Agent': useragent })
+  soup = BeautifulSoup(req.data)
+  return soup
+
 def geturltitle(url):
   if youtuberegex.search(url.lower()) is None:
     # only react to youtube URLs for now
     return ""
+    page = getpage(url)
+    print("page encoding: {}".format(page.encoding))
+    title = page.title.string.lstrip()
+    return sanitize(title)
   try:
-    page = pq(url, headers={'user-agent': useragent})
-    title = page("title").text().lstrip()
+    page = getpage(url)
+    print("page encoding: {}".format(page.encoding))
+    title = page.title.string.lstrip()
     if youtuberegex.search(url.lower()) is not None:
-      videoid = page('meta[itemProp="videoId"]')[0].attrib['content']
-      durationstr = page('meta[itemProp="duration"]')[0].attrib['content']
+      videoid = page.find('meta', attrs={'itemprop': 'videoId'}).attrs['content']
+      durationstr = page.find('meta', attrs={'itemprop': 'duration'}).attrs['content']
       match = re.search('PT(?P<minutes>[0-9]+)M(?P<seconds>[0-9]+)S', durationstr)
       if match:
         minutes, seconds = match.groups()
